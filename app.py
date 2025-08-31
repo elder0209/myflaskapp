@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 import os
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_oauthlib.client import OAuth
 
 print("DB_HOST from env:", os.getenv("DB_HOST"))
 
@@ -26,7 +27,6 @@ def get_db_connection():
         )
         cursor = db.cursor(dictionary=True)
 
-        # Safer session settings
         for setting in [
             "SET SESSION net_read_timeout = 600",
             "SET SESSION net_write_timeout = 600",
@@ -45,6 +45,23 @@ def get_db_connection():
 
 db, cursor = get_db_connection()
 
+# -------------------
+# GOOGLE OAUTH SETUP
+# -------------------
+oauth = OAuth(app)
+google = oauth.remote_app(
+    'google',
+    consumer_key=os.getenv("GOOGLE_CLIENT_ID"),
+    consumer_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    request_token_params={
+        'scope': 'email profile'
+    },
+    base_url='https://www.googleapis.com/oauth2/v1/',
+    request_token_url=None,
+    access_token_method='POST',
+    access_token_url='https://accounts.google.com/o/oauth2/token',
+    authorize_url='https://accounts.google.com/o/oauth2/auth',
+)
 
 # -------------------
 # UTILS: FETCH ARTICLE
@@ -69,7 +86,6 @@ def fetch_article_text(url):
     content = " ".join(paragraphs[:6]) if paragraphs else "⚠️ No content found"
     return title[:150], content[:800]
 
-
 # -------------------
 # ROUTES
 # -------------------
@@ -86,17 +102,18 @@ def home():
 
     return render_template(
         "index.html",
-        name=session["name"],
+        name=session.get("name"),
         safe_news=safe_news,
         risky_news=risky_news,
         today=date.today(),
     )
 
-
+# -------------------
+# SIGNUP / LOGIN
+# -------------------
 @app.route("/signup_page")
 def signup_page():
     return render_template("signup.html")
-
 
 @app.route("/signup", methods=["POST"])
 def signup():
@@ -116,11 +133,9 @@ def signup():
     flash("Signup successful! Please login.", "success")
     return redirect(url_for("login_page"))
 
-
 @app.route("/login_page")
 def login_page():
     return render_template("login.html")
-
 
 @app.route("/login_user", methods=["POST"])
 def login_user():
@@ -138,99 +153,50 @@ def login_user():
         flash("Invalid credentials!", "danger")
         return redirect(url_for("login_page"))
 
+@app.route("/login/google")
+def login_google():
+    return google.authorize(callback=url_for('authorized_google', _external=True))
+
+@app.route("/login/callback")
+def authorized_google():
+    resp = google.authorized_response()
+    if resp is None or resp.get('access_token') is None:
+        flash("Access denied.", "danger")
+        return redirect(url_for("login_page"))
+
+    session['google_token'] = (resp['access_token'], '')
+    user_info = google.get('userinfo').data
+    email = user_info['email']
+    name = user_info.get('name', email.split("@")[0])
+
+    cursor.execute("SELECT * FROM Users WHERE email=%s", (email,))
+    user = cursor.fetchone()
+
+    if not user:
+        # Create user if doesn't exist
+        cursor.execute("INSERT INTO Users (name, email) VALUES (%s, %s)", (name, email))
+        db.commit()
+        cursor.execute("SELECT * FROM Users WHERE email=%s", (email,))
+        user = cursor.fetchone()
+
+    session["user_id"] = user["user_id"]
+    session["name"] = user["name"]
+    flash(f"Logged in as {name}", "success")
+    return redirect(url_for("home"))
+
+@google.tokengetter
+def get_google_oauth_token():
+    return session.get('google_token')
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("login_page"))
 
-
-@app.route("/add_article", methods=["POST"])
-def add_article():
-    title = request.form["title"]
-    content = request.form["content"]
-    url_link = request.form["url"]
-    publish_date = request.form["publish_date"]
-
-    cursor.execute("SELECT source_id FROM Sources LIMIT 1")
-    source = cursor.fetchone()
-    source_id = source["source_id"] if source else 1
-
-    cursor.execute(
-        "INSERT INTO Articles (title, content, url, publish_date, source_id, trust_score, source) "
-        "VALUES (%s,%s,%s,%s,%s,%s,%s)",
-        (title, content, url_link, publish_date, source_id, 50, "manual")
-    )
-    db.commit()
-    flash("Article submitted!", "success")
-    return redirect(url_for("home"))
-
-
-@app.route("/check_trust", methods=["POST"])
-def check_trust():
-    article_id = request.form["article_id"]
-    cursor.execute("SELECT trust_score FROM Articles WHERE article_id=%s", (article_id,))
-    article = cursor.fetchone()
-    if article:
-        flash(f"Trust Score: {article['trust_score']}", "info")
-    else:
-        flash("Article not found!", "danger")
-    return redirect(url_for("home"))
-
-
-@app.route("/check_online", methods=["POST"])
-def check_online():
-    url_link = request.form["url_link"]
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        resp = requests.get(url_link, headers=headers, timeout=10)
-        resp.raise_for_status()
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-        title = soup.title.string if soup.title else "Untitled"
-        text = " ".join([p.get_text() for p in soup.find_all("p")[:3]])
-        snippet = text[:300] + "..." if len(text) > 300 else text
-        score = random.randint(40, 95)
-
-        cursor.execute(
-            "INSERT INTO Articles (title, content, url, publish_date, trust_score, source) "
-            "VALUES (%s, %s, %s, NOW(), %s, %s)",
-            (title, snippet, url_link, score, "online")
-        )
-        db.commit()
-        flash(f"✅ Online article checked! Trust Score: {score}", "success")
-    except Exception as e:
-        flash(f"❌ Failed to fetch online article. Error: {str(e)}", "danger")
-
-    return redirect(url_for("home"))
-
-
-@app.route("/report_article", methods=["POST"])
-def report_article():
-    article_id = request.form["article_id"]
-    reason = request.form["reason"]
-    user_id = session.get("user_id")
-    if not user_id:
-        flash("You must be logged in to report!", "danger")
-        return redirect(url_for("login_page"))
-
-    cursor.execute(
-        "INSERT INTO Reports (article_id, user_id, reason) VALUES (%s,%s,%s)",
-        (article_id, user_id, reason)
-    )
-    db.commit()
-
-    cursor.execute("SELECT COUNT(*) AS report_count FROM Reports WHERE article_id=%s", (article_id,))
-    report_data = cursor.fetchone()
-    report_count = report_data["report_count"] if report_data else 0
-    new_score = max(0, 100 - (report_count * 10))
-
-    cursor.execute("UPDATE Articles SET trust_score=%s WHERE article_id=%s", (new_score, article_id))
-    db.commit()
-
-    flash(f"Report submitted! Trust Score updated to {new_score}.", "success")
-    return redirect(url_for("home"))
-
+# -------------------
+# OTHER ROUTES (ARTICLES, REPORTS, CHECK ONLINE) – KEEP YOUR ORIGINAL CODE
+# -------------------
+# (Copy all your article/report routes here, unchanged)
 
 # -------------------
 # RUN APP
