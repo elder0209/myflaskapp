@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 import os
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_oauthlib.client import OAuth
+from authlib.integrations.flask_client import OAuth
 
 print("DB_HOST from env:", os.getenv("DB_HOST"))
 
@@ -46,21 +46,18 @@ def get_db_connection():
 db, cursor = get_db_connection()
 
 # -------------------
-# GOOGLE OAUTH SETUP
+# GOOGLE OAUTH SETUP (Authlib)
 # -------------------
 oauth = OAuth(app)
-google = oauth.remote_app(
-    'google',
-    consumer_key=os.getenv("GOOGLE_CLIENT_ID"),
-    consumer_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-    request_token_params={
-        'scope': 'email profile'
-    },
-    base_url='https://www.googleapis.com/oauth2/v1/',
-    request_token_url=None,
-    access_token_method='POST',
+google = oauth.register(
+    name='google',
+    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
     access_token_url='https://accounts.google.com/o/oauth2/token',
     authorize_url='https://accounts.google.com/o/oauth2/auth',
+    api_base_url='https://www.googleapis.com/oauth2/v1/',
+    userinfo_endpoint='https://www.googleapis.com/oauth2/v1/userinfo',
+    client_kwargs={'scope': 'openid email profile'}
 )
 
 # -------------------
@@ -153,19 +150,19 @@ def login_user():
         flash("Invalid credentials!", "danger")
         return redirect(url_for("login_page"))
 
+# -------------------
+# GOOGLE LOGIN ROUTES
+# -------------------
 @app.route("/login/google")
 def login_google():
-    return google.authorize(callback=url_for('authorized_google', _external=True))
+    redirect_uri = url_for('authorized_google', _external=True)
+    return google.authorize_redirect(redirect_uri)
 
 @app.route("/login/callback")
 def authorized_google():
-    resp = google.authorized_response()
-    if resp is None or resp.get('access_token') is None:
-        flash("Access denied.", "danger")
-        return redirect(url_for("login_page"))
+    token = google.authorize_access_token()
+    user_info = google.get('userinfo').json()
 
-    session['google_token'] = (resp['access_token'], '')
-    user_info = google.get('userinfo').data
     email = user_info['email']
     name = user_info.get('name', email.split("@")[0])
 
@@ -184,19 +181,16 @@ def authorized_google():
     flash(f"Logged in as {name}", "success")
     return redirect(url_for("home"))
 
-@google.tokengetter
-def get_google_oauth_token():
-    return session.get('google_token')
-
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("login_page"))
 
 # -------------------
-# OTHER ROUTES (ARTICLES, REPORTS, CHECK ONLINE) – KEEP YOUR ORIGINAL CODE
+# ARTICLE / REPORT / CHECK ONLINE ROUTES
 # -------------------
-# (Copy all your article/report routes here, unchanged)
+# Copy your existing article routes (add_article, check_trust, check_online, report_article) here
+# unchanged from your original code.
 
 # -------------------
 # RUN APP
