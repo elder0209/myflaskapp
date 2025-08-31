@@ -10,3 +10,4 @@ cloudscraper
 Flask-OAuthlib
 google-auth
 google-auth-oauthlib
+authlib
