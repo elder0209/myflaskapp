@@ -4,6 +4,9 @@ from datetime import date
 import requests
 from bs4 import BeautifulSoup
 
+import os
+print("DB_HOST from env:", os.getenv("DB_HOST"))
+
 app = Flask(__name__)
 app.secret_key = "your_secret_key_here"
 
