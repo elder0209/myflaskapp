@@ -4,7 +4,6 @@ from datetime import date
 import requests
 from bs4 import BeautifulSoup
 import os
-import random
 from requests_html import HTMLSession
 
 print("DB_HOST from env:", os.getenv("DB_HOST"))
@@ -191,9 +190,10 @@ def check_online():
         flash("Please provide a URL!", "warning")
         return redirect(url_for("home"))
 
+    text = ""
     try:
         # --- Try with requests_html (handles JS + Cloudflare) ---
-        session = HTMLSession()
+        session_html = HTMLSession()
         headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -201,8 +201,8 @@ def check_online():
                 "Chrome/122.0.0.0 Safari/537.36"
             )
         }
-        r = session.get(url_link, headers=headers)
-        r.html.render(timeout=20, sleep=2)  # run JavaScript
+        r = session_html.get(url_link, headers=headers)
+        r.html.render(timeout=20, sleep=2)
 
         paragraphs = r.html.find("p")
         text = " ".join(p.text for p in paragraphs if p.text)[:500]
@@ -210,7 +210,7 @@ def check_online():
         if not text.strip():
             text = r.html.text[:500]
 
-    except Exception as e1:
+    except Exception:
         try:
             # --- Fallback: normal requests ---
             headers = {
@@ -221,7 +221,6 @@ def check_online():
                 )
             }
             r = requests.get(url_link, headers=headers, timeout=15)
-            from bs4 import BeautifulSoup
             soup = BeautifulSoup(r.text, "html.parser")
             text = " ".join(p.get_text() for p in soup.find_all("p"))[:500]
 
@@ -237,12 +236,12 @@ def check_online():
             score -= 30
     score = max(min(score, 100), 0)
 
-    flash(f"Online Article Trust Score: {score}", "info")
-    flash(f"Extracted Snippet: {text[:200]}...", "secondary")
+    # save to session so homepage can show
+    session["online_snippet"] = text
+    session["online_score"] = score
+    session["online_url"] = url_link
 
     return redirect(url_for("home"))
-
-
 
 
 # -------------------
@@ -254,14 +253,12 @@ def report_article():
     reason = request.form["reason"]
     user_id = session["user_id"]
 
-    # Insert report
     cursor.execute(
         "INSERT INTO Reports (article_id, user_id, reason) VALUES (%s,%s,%s)",
         (article_id, user_id, reason)
     )
     db.commit()
 
-    # Recalculate Trust Score
     cursor.execute("SELECT COUNT(*) AS report_count FROM Reports WHERE article_id=%s", (article_id,))
     report_data = cursor.fetchone()
     report_count = report_data["report_count"] if report_data else 0
