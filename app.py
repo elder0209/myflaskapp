@@ -9,10 +9,10 @@ app.secret_key = "your_secret_key_here"
 
 # MySQL connection
 db = mysql.connector.connect(
-    host="b3eidflxnzuksrsscmmt-mysql.services.clever-cloud.com",
-    user="uyk9syu5jkvhrqju",
-    password="uyk9syu5jkvhrqju",
-    database="Detector"
+    host="DB_HOST",
+    user="DB_NAME",
+    password="DB_PASS",
+    database="DB_NAME"
 )
 cursor = db.cursor(dictionary=True)
 
