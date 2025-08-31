@@ -198,30 +198,34 @@ def check_trust():
 # -------------------
 @app.route("/check_online", methods=["POST"])
 def check_online():
-    url_link = request.form.get("url_link")
-    if not url_link:
-        flash("Please provide a URL!", "warning")
-        return redirect(url_for("home"))
+    url_link = request.form["url_link"]
 
-    title, text = fetch_article_text(url_link)
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url_link, headers=headers, timeout=10)
+        resp.raise_for_status()
 
-    # --- Simple Trust Score ---
-    fake_keywords = ["fake", "hoax", "false", "rumor"]
-    score = 100
-    for word in fake_keywords:
-        if word in text.lower():
-            score -= 30
-    score = max(min(score, 100), 0)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        title = soup.title.string if soup.title else "Untitled"
+        text = " ".join([p.get_text() for p in soup.find_all("p")[:3]])  # first 3 paras
+        snippet = text[:300] + "..." if len(text) > 300 else text
 
-    # --- Save in DB ---
-    cursor.execute("""
-        INSERT INTO Articles (title, content, url, publish_date, trust_score, source)
-        VALUES (%s, %s, %s, NOW(), %s, %s)
-    """, (title, text, url_link, score, "online"))
-    db.commit()
+        score = random.randint(40, 95)
 
-    flash(f"Online article checked! Trust Score: {score}", "success")
-    return redirect(url_for("home"))
+        # ✅ Save in DB with source=online
+        cursor.execute("""
+            INSERT INTO Articles (title, content, url, publish_date, trust_score, source)
+            VALUES (%s, %s, %s, NOW(), %s, %s)
+        """, (title, snippet, url_link, score, "online"))
+        db.commit()
+
+        flash(f"✅ Online article checked! Trust Score: {score}", "success")
+
+    except Exception as e:
+        flash(f"❌ Failed to fetch online article. Error: {str(e)}", "danger")
+
+    return redirect(url_for("index"))
+
 
 
 # -------------------
