@@ -9,10 +9,10 @@ app.secret_key = "your_secret_key_here"
 
 # MySQL connection
 db = mysql.connector.connect(
-    host="DB_HOST",
-    user="DB_NAME",
-    password="DB_PASS",
-    database="DB_NAME"
+    host=os.getenv("DB_HOST"),
+    user=os.getenv("DB_USER"),
+    password=os.getenv("DB_PASS"),
+    database=os.getenv("DB_NAME")
 )
 cursor = db.cursor(dictionary=True)
 
