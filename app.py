@@ -4,7 +4,6 @@ from datetime import date
 import requests
 from bs4 import BeautifulSoup
 import os
-from requests_html import HTMLSession
 
 print("DB_HOST from env:", os.getenv("DB_HOST"))
 
@@ -29,8 +28,7 @@ try:
         "SET SESSION net_read_timeout = 600",
         "SET SESSION net_write_timeout = 600",
         "SET SESSION wait_timeout = 600",
-        "SET SESSION interactive_timeout = 600",
-        "SET SESSION max_allowed_packet = 134217728"
+        "SET SESSION interactive_timeout = 600"
     ]:
         try:
             cursor.execute(setting)
@@ -44,6 +42,32 @@ except mysql.connector.Error as err:
 
 
 # -------------------
+# UTILS: FETCH ARTICLE
+# -------------------
+def fetch_article_text(url):
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/118.0 Safari/537.36"
+        )
+    }
+    try:
+        resp = requests.get(url, headers=headers, timeout=15)
+        resp.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        return "Untitled Online Article", f"❌ Failed to fetch article: {e}"
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    title = soup.title.string.strip() if soup.title else "Untitled Online Article"
+    paragraphs = [p.get_text(strip=True) for p in soup.find_all("p") if p.get_text(strip=True)]
+    content = " ".join(paragraphs[:6]) if paragraphs else "⚠️ No content found"
+
+    return title[:150], content[:800]
+
+
+# -------------------
 # HOME PAGE
 # -------------------
 @app.route("/")
@@ -51,10 +75,10 @@ def home():
     if "user_id" not in session:
         return redirect(url_for("login_page"))
 
-    cursor.execute("SELECT * FROM Articles WHERE trust_score >= 60")
+    cursor.execute("SELECT * FROM Articles WHERE trust_score >= 60 ORDER BY publish_date DESC")
     safe_news = cursor.fetchall()
 
-    cursor.execute("SELECT * FROM Articles WHERE trust_score < 60")
+    cursor.execute("SELECT * FROM Articles WHERE trust_score < 60 ORDER BY publish_date DESC")
     risky_news = cursor.fetchall()
 
     return render_template(
@@ -63,9 +87,6 @@ def home():
         safe_news=safe_news,
         risky_news=risky_news,
         today=date.today(),
-        online_snippet=session.get("online_snippet"),
-        online_score=session.get("online_score"),
-        online_url=session.get("online_url")
     )
 
 
@@ -84,16 +105,12 @@ def signup():
     password = request.form["password"]
 
     cursor.execute("SELECT * FROM Users WHERE name=%s", (name,))
-    existing_name = cursor.fetchone()
-
-    if existing_name:
+    if cursor.fetchone():
         flash("Username already in use!", "danger")
         return redirect(url_for("signup_page"))
 
     cursor.execute("SELECT * FROM Users WHERE email=%s", (email,))
-    existing_email = cursor.fetchone()
-
-    if existing_email:
+    if cursor.fetchone():
         flash("Email already in use!", "danger")
         return redirect(url_for("signup_page"))
 
@@ -105,7 +122,7 @@ def signup():
 
 
 # -------------------
-# LOGIN PAGE
+# LOGIN
 # -------------------
 @app.route("/login_page")
 def login_page():
@@ -132,9 +149,6 @@ def login_user():
         return redirect(url_for("login_page"))
 
 
-# -------------------
-# LOGOUT
-# -------------------
 @app.route("/logout")
 def logout():
     session.clear()
@@ -142,7 +156,7 @@ def logout():
 
 
 # -------------------
-# ADD ARTICLE
+# ADD ARTICLE MANUAL
 # -------------------
 @app.route("/add_article", methods=["POST"])
 def add_article():
@@ -151,14 +165,13 @@ def add_article():
     url_link = request.form["url"]
     publish_date = request.form["publish_date"]
 
-    # Default source id
     cursor.execute("SELECT source_id FROM Sources LIMIT 1")
     source = cursor.fetchone()
     source_id = source["source_id"] if source else 1
 
     cursor.execute(
-        "INSERT INTO Articles (title, content, url, publish_date, source_id) VALUES (%s,%s,%s,%s,%s)",
-        (title, content, url_link, publish_date, source_id)
+        "INSERT INTO Articles (title, content, url, publish_date, source_id, trust_score, source) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+        (title, content, url_link, publish_date, source_id, 50, "manual")
     )
     db.commit()
     flash("Article submitted!", "success")
@@ -166,7 +179,7 @@ def add_article():
 
 
 # -------------------
-# CHECK TRUST SCORE (Saved Articles)
+# CHECK TRUST (Saved)
 # -------------------
 @app.route("/check_trust", methods=["POST"])
 def check_trust():
@@ -190,52 +203,10 @@ def check_online():
         flash("Please provide a URL!", "warning")
         return redirect(url_for("home"))
 
-    text = ""
-    title = ""
-    try:
-        # --- Try with requests_html ---
-        session_html = HTMLSession()
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/122.0.0.0 Safari/537.36"
-            )
-        }
-        r = session_html.get(url_link, headers=headers)
-        r.html.render(timeout=20, sleep=2)
-
-        # Title
-        if r.html.find("title", first=True):
-            title = r.html.find("title", first=True).text[:150]
-
-        # Content
-        paragraphs = r.html.find("p")
-        text = " ".join(p.text for p in paragraphs if p.text)[:500]
-        if not text.strip():
-            text = r.html.text[:500]
-
-    except Exception:
-        try:
-            # --- Fallback: requests + BeautifulSoup ---
-            headers = {
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/122.0.0.0 Safari/537.36"
-                )
-            }
-            r = requests.get(url_link, headers=headers, timeout=15)
-            soup = BeautifulSoup(r.text, "html.parser")
-
-            title = soup.title.string[:150] if soup.title else "Untitled Online Article"
-            text = " ".join(p.get_text() for p in soup.find_all("p"))[:500]
-        except Exception as e2:
-            flash(f"Failed to fetch online article. Error: {str(e2)}", "danger")
-            return redirect(url_for("home"))
+    title, text = fetch_article_text(url_link)
 
     # --- Simple Trust Score ---
-    fake_keywords = ["fake", "hoax", "false"]
+    fake_keywords = ["fake", "hoax", "false", "rumor"]
     score = 100
     for word in fake_keywords:
         if word in text.lower():
@@ -243,17 +214,14 @@ def check_online():
     score = max(min(score, 100), 0)
 
     # --- Save in DB ---
-    db = get_db()
-    cursor = db.cursor(dictionary=True)
     cursor.execute("""
         INSERT INTO Articles (title, content, url, publish_date, trust_score, source)
         VALUES (%s, %s, %s, NOW(), %s, %s)
     """, (title, text, url_link, score, "online"))
     db.commit()
 
-    flash("Online article checked and stored!", "success")
+    flash(f"Online article checked! Trust Score: {score}", "success")
     return redirect(url_for("home"))
-
 
 
 # -------------------
