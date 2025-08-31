@@ -51,6 +51,17 @@
         <input type="submit" class="btn btn-warning" value="Check Online">
     </form>
 
+    <!-- ✅ Online Snippet Preview -->
+    {% if session.get("online_snippet") %}
+    <div class="card mt-3 shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Online Article Preview</h5>
+        <p><strong>Trust Score:</strong> {{ session.get("online_score") }}</p>
+        <p>{{ session.get("online_snippet") }}...</p>
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Safe News -->
     <h4 class="mt-4">Safe News Articles</h4>
     <table class="table table-bordered">
