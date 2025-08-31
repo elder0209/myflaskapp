@@ -224,7 +224,7 @@ def check_online():
     except Exception as e:
         flash(f"❌ Failed to fetch online article. Error: {str(e)}", "danger")
 
-    return redirect(url_for("index"))
+    return redirect(url_for("home"))
 
 
 
