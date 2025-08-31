@@ -133,22 +133,7 @@ def add_article():
     flash("Article submitted!", "success")
     return redirect(url_for("home"))
 
-# -------------------
-# REPORT ARTICLE
-# -------------------
-@app.route("/report_article", methods=["POST"])
-def report_article():
-    article_id = request.form["article_id"]
-    reason = request.form["reason"]
-    user_id = session["user_id"]
-
-    cursor.execute(
-        "INSERT INTO Reports (article_id, user_id, reason) VALUES (%s,%s,%s)",
-        (article_id, user_id, reason)
-    )
-    db.commit()
-    flash("Report submitted!", "success")
-    return redirect(url_for("home"))
+# --------------
 
 # -------------------
 # CHECK TRUST SCORE
