@@ -7,3 +7,6 @@ requests-html
 lxml_html_clean
 newspaper3k
 cloudscraper
+Flask-OAuthlib
+google-auth
+google-auth-oauthlib
