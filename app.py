@@ -189,39 +189,38 @@ def check_online():
     if not url_link:
         flash("Please provide a URL!", "warning")
         return redirect(url_for("home"))
-
     try:
-        r = requests.get(url_link, timeout=10)
-        r.raise_for_status()
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                          "AppleWebKit/537.36 (KHTML, like Gecko) "
+                          "Chrome/122.0.0.0 Safari/537.36"
+        }
+        r = requests.get(url_link, headers=headers, timeout=10)
+        r.raise_for_status()  # Raise error for 403/404/etc.
+
         soup = BeautifulSoup(r.text, "html.parser")
 
-        # Extract title & snippet
-        title = soup.title.string if soup.title else "Untitled"
-        paragraphs = " ".join([p.get_text() for p in soup.find_all("p")])
-        snippet = paragraphs[:300] if paragraphs else "No content found."
+        # Try to get article <p> tags instead of all text
+        paragraphs = soup.find_all("p")
+        text = " ".join(p.get_text() for p in paragraphs)[:500]
 
-        # Simple trust score logic
-        fake_keywords = ["fake", "hoax", "false", "rumor"]
+        if not text.strip():
+            text = soup.get_text(separator=" ", strip=True)[:500]
+
+        fake_keywords = ["fake", "hoax", "false"]
         score = 100
         for word in fake_keywords:
-            if word in paragraphs.lower():
+            if word in text.lower():
                 score -= 30
         score = max(min(score, 100), 0)
 
-        # Store in session for homepage preview
-        session["online_snippet"] = snippet
-        session["online_score"] = score
-        session["online_url"] = url_link
-
-        flash("Online article checked successfully!", "success")
+        flash(f"Online Article Trust Score (simple check): {score}", "info")
+        flash(f"Extracted Snippet: {text[:200]}...", "secondary")
 
     except Exception as e:
-        flash(f"Failed to fetch online article. Error: {e}", "danger")
-        session.pop("online_snippet", None)
-        session.pop("online_score", None)
-        session.pop("online_url", None)
-
+        flash(f"Failed to fetch online article. Error: {str(e)}", "danger")
     return redirect(url_for("home"))
+
 
 
 # -------------------
