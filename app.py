@@ -5,6 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 import os
 import random
+from requests_html import HTMLSession
 
 print("DB_HOST from env:", os.getenv("DB_HOST"))
 
@@ -189,37 +190,58 @@ def check_online():
     if not url_link:
         flash("Please provide a URL!", "warning")
         return redirect(url_for("home"))
+
     try:
+        # --- Try with requests_html (handles JS + Cloudflare) ---
+        session = HTMLSession()
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                          "AppleWebKit/537.36 (KHTML, like Gecko) "
-                          "Chrome/122.0.0.0 Safari/537.36"
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/122.0.0.0 Safari/537.36"
+            )
         }
-        r = requests.get(url_link, headers=headers, timeout=10)
-        r.raise_for_status()  # Raise error for 403/404/etc.
+        r = session.get(url_link, headers=headers)
+        r.html.render(timeout=20, sleep=2)  # run JavaScript
 
-        soup = BeautifulSoup(r.text, "html.parser")
-
-        # Try to get article <p> tags instead of all text
-        paragraphs = soup.find_all("p")
-        text = " ".join(p.get_text() for p in paragraphs)[:500]
+        paragraphs = r.html.find("p")
+        text = " ".join(p.text for p in paragraphs if p.text)[:500]
 
         if not text.strip():
-            text = soup.get_text(separator=" ", strip=True)[:500]
+            text = r.html.text[:500]
 
-        fake_keywords = ["fake", "hoax", "false"]
-        score = 100
-        for word in fake_keywords:
-            if word in text.lower():
-                score -= 30
-        score = max(min(score, 100), 0)
+    except Exception as e1:
+        try:
+            # --- Fallback: normal requests ---
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/122.0.0.0 Safari/537.36"
+                )
+            }
+            r = requests.get(url_link, headers=headers, timeout=15)
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(r.text, "html.parser")
+            text = " ".join(p.get_text() for p in soup.find_all("p"))[:500]
 
-        flash(f"Online Article Trust Score (simple check): {score}", "info")
-        flash(f"Extracted Snippet: {text[:200]}...", "secondary")
+        except Exception as e2:
+            flash(f"Failed to fetch online article. Error: {str(e2)}", "danger")
+            return redirect(url_for("home"))
 
-    except Exception as e:
-        flash(f"Failed to fetch online article. Error: {str(e)}", "danger")
+    # --- Simple Trust Score ---
+    fake_keywords = ["fake", "hoax", "false"]
+    score = 100
+    for word in fake_keywords:
+        if word in text.lower():
+            score -= 30
+    score = max(min(score, 100), 0)
+
+    flash(f"Online Article Trust Score: {score}", "info")
+    flash(f"Extracted Snippet: {text[:200]}...", "secondary")
+
     return redirect(url_for("home"))
+
 
 
 
