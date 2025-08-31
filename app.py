@@ -3,21 +3,44 @@ import mysql.connector
 from datetime import date
 import requests
 from bs4 import BeautifulSoup
-
 import os
+
 print("DB_HOST from env:", os.getenv("DB_HOST"))
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key_here"
 
-# MySQL connection
-db = mysql.connector.connect(
-    host=os.getenv("DB_HOST"),
-    user=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASS"),
-    database=os.getenv("DB_NAME")
-)
-cursor = db.cursor(dictionary=True)
+# -------------------
+# MYSQL CONNECTION
+# -------------------
+try:
+    db = mysql.connector.connect(
+        host=os.getenv("DB_HOST"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASS"),
+        database=os.getenv("DB_NAME"),
+        connection_timeout=20
+    )
+    cursor = db.cursor(dictionary=True)
+
+    # Apply safer session settings
+    for setting in [
+        "SET SESSION net_read_timeout = 600",
+        "SET SESSION net_write_timeout = 600",
+        "SET SESSION wait_timeout = 600",
+        "SET SESSION interactive_timeout = 600",
+        "SET SESSION max_allowed_packet = 134217728"
+    ]:
+        try:
+            cursor.execute(setting)
+        except Exception as e:
+            print(f"Warning: Could not apply setting {setting} - {e}")
+
+except mysql.connector.Error as err:
+    print("❌ Database connection failed:", err)
+    db = None
+    cursor = None
+
 
 # -------------------
 # HOME PAGE
@@ -41,12 +64,14 @@ def home():
         today=date.today()
     )
 
+
 # -------------------
 # SIGNUP PAGE
 # -------------------
 @app.route("/signup_page")
 def signup_page():
     return render_template("signup.html")
+
 
 @app.route("/signup", methods=["POST"])
 def signup():
@@ -68,8 +93,7 @@ def signup():
         flash("Email already in use!", "danger")
         return redirect(url_for("signup_page"))
 
-
-    cursor.execute("INSERT INTO Users (name, email, password) VALUES (%s, %s, %s)", 
+    cursor.execute("INSERT INTO Users (name, email, password) VALUES (%s, %s, %s)",
                    (name, email, password))
     db.commit()
     flash("Signup successful! Please login.", "success")
@@ -82,6 +106,7 @@ def signup():
 @app.route("/login_page")
 def login_page():
     return render_template("login.html")
+
 
 @app.route("/login_user", methods=["POST"])
 def login_user():
@@ -102,6 +127,7 @@ def login_user():
         flash("Invalid credentials!", "danger")
         return redirect(url_for("login_page"))
 
+
 # -------------------
 # LOGOUT
 # -------------------
@@ -109,6 +135,7 @@ def login_user():
 def logout():
     session.clear()
     return redirect(url_for("login_page"))
+
 
 # -------------------
 # ADD ARTICLE
@@ -133,7 +160,6 @@ def add_article():
     flash("Article submitted!", "success")
     return redirect(url_for("home"))
 
-# --------------
 
 # -------------------
 # CHECK TRUST SCORE
@@ -149,19 +175,20 @@ def check_trust():
         flash("Article not found!", "danger")
     return redirect(url_for("home"))
 
+
 # -------------------
 # CHECK ONLINE NEWS
 # -------------------
 @app.route("/check_online", methods=["POST"])
 def check_online():
-    url_link = request.form.get("url_link")  # safer with .get()
+    url_link = request.form.get("url_link")
     if not url_link:
         flash("Please provide a URL!", "warning")
         return redirect(url_for("home"))
     try:
         r = requests.get(url_link)
         soup = BeautifulSoup(r.text, "html.parser")
-        text = soup.get_text(separator=' ', strip=True)[:500]  # first 500 chars
+        text = soup.get_text(separator=' ', strip=True)[:500]
         fake_keywords = ["fake", "hoax", "false"]
         score = 100
         for word in fake_keywords:
@@ -172,6 +199,7 @@ def check_online():
     except:
         flash("Failed to fetch online article.", "danger")
     return redirect(url_for("home"))
+
 
 # -------------------
 # REPORT ARTICLE
@@ -189,12 +217,11 @@ def report_article():
     )
     db.commit()
 
-    # --- Recalculate Trust Score manually ---
+    # Recalculate Trust Score
     cursor.execute("SELECT COUNT(*) AS report_count FROM Reports WHERE article_id=%s", (article_id,))
     report_data = cursor.fetchone()
     report_count = report_data["report_count"] if report_data else 0
 
-    # Simple formula: Start from 100, -10 per report (minimum 0)
     new_score = max(0, 100 - (report_count * 10))
 
     cursor.execute("UPDATE Articles SET trust_score=%s WHERE article_id=%s", (new_score, article_id))
@@ -203,10 +230,12 @@ def report_article():
     flash(f"Report submitted! Trust Score updated to {new_score}.", "success")
     return redirect(url_for("home"))
 
+
+# -------------------
+# RUN APP
+# -------------------
 if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
         port=5000,
     )
-
-
