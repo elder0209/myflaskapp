@@ -6,12 +6,11 @@ from bs4 import BeautifulSoup
 import os
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
-from authlib.integrations.flask_client import OAuth
 
 print("DB_HOST from env:", os.getenv("DB_HOST"))
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET", "supersecretkey")  # Prefer env var
+app.secret_key = os.getenv("FLASK_SECRET", "supersecretkey")
 
 # -------------------
 # MYSQL CONNECTION
@@ -46,31 +45,10 @@ def get_db_connection():
 db, cursor = get_db_connection()
 
 # -------------------
-# GOOGLE OAUTH SETUP (Authlib)
-# -------------------
-oauth = OAuth(app)
-google = oauth.register(
-    name='google',
-    client_id=os.getenv("GOOGLE_CLIENT_ID"),
-    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-    access_token_url='https://accounts.google.com/o/oauth2/token',
-    authorize_url='https://accounts.google.com/o/oauth2/auth',
-    api_base_url='https://www.googleapis.com/oauth2/v1/',
-    userinfo_endpoint='https://www.googleapis.com/oauth2/v1/userinfo',
-    client_kwargs={'scope': 'openid email profile'}
-)
-
-# -------------------
 # UTILS: FETCH ARTICLE
 # -------------------
 def fetch_article_text(url):
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/118.0 Safari/537.36"
-        )
-    }
+    headers = {"User-Agent": "Mozilla/5.0"}
     try:
         resp = requests.get(url, headers=headers, timeout=15)
         resp.raise_for_status()
@@ -150,47 +128,87 @@ def login_user():
         flash("Invalid credentials!", "danger")
         return redirect(url_for("login_page"))
 
-# -------------------
-# GOOGLE LOGIN ROUTES
-# -------------------
-@app.route("/login/google")
-def login_google():
-    redirect_uri = url_for('authorized_google', _external=True)
-    return google.authorize_redirect(redirect_uri)
-
-@app.route("/login/callback")
-def authorized_google():
-    token = google.authorize_access_token()
-    user_info = google.get('userinfo').json()
-
-    email = user_info['email']
-    name = user_info.get('name', email.split("@")[0])
-
-    cursor.execute("SELECT * FROM Users WHERE email=%s", (email,))
-    user = cursor.fetchone()
-
-    if not user:
-        # Create user if doesn't exist
-        cursor.execute("INSERT INTO Users (name, email) VALUES (%s, %s)", (name, email))
-        db.commit()
-        cursor.execute("SELECT * FROM Users WHERE email=%s", (email,))
-        user = cursor.fetchone()
-
-    session["user_id"] = user["user_id"]
-    session["name"] = user["name"]
-    flash(f"Logged in as {name}", "success")
-    return redirect(url_for("home"))
-
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("login_page"))
 
 # -------------------
-# ARTICLE / REPORT / CHECK ONLINE ROUTES
+# ARTICLE / REPORT ROUTES
 # -------------------
-# Copy your existing article routes (add_article, check_trust, check_online, report_article) here
-# unchanged from your original code.
+@app.route("/add_article", methods=["POST"])
+def add_article():
+    title = request.form["title"]
+    content = request.form["content"]
+    url_link = request.form["url"]
+    publish_date = request.form["publish_date"]
+
+    cursor.execute("SELECT source_id FROM Sources LIMIT 1")
+    source = cursor.fetchone()
+    source_id = source["source_id"] if source else 1
+
+    cursor.execute(
+        "INSERT INTO Articles (title, content, url, publish_date, source_id, trust_score, source) "
+        "VALUES (%s,%s,%s,%s,%s,%s,%s)",
+        (title, content, url_link, publish_date, source_id, 50, "manual")
+    )
+    db.commit()
+    flash("Article submitted!", "success")
+    return redirect(url_for("home"))
+
+@app.route("/check_trust", methods=["POST"])
+def check_trust():
+    article_id = request.form["article_id"]
+    cursor.execute("SELECT trust_score FROM Articles WHERE article_id=%s", (article_id,))
+    article = cursor.fetchone()
+    if article:
+        flash(f"Trust Score: {article['trust_score']}", "info")
+    else:
+        flash("Article not found!", "danger")
+    return redirect(url_for("home"))
+
+@app.route("/check_online", methods=["POST"])
+def check_online():
+    url_link = request.form["url_link"]
+    try:
+        title, snippet = fetch_article_text(url_link)
+        score = random.randint(40, 95)
+        cursor.execute(
+            "INSERT INTO Articles (title, content, url, publish_date, trust_score, source) "
+            "VALUES (%s, %s, %s, NOW(), %s, %s)",
+            (title, snippet, url_link, score, "online")
+        )
+        db.commit()
+        flash(f"✅ Online article checked! Trust Score: {score}", "success")
+    except Exception as e:
+        flash(f"❌ Failed to fetch online article. Error: {str(e)}", "danger")
+    return redirect(url_for("home"))
+
+@app.route("/report_article", methods=["POST"])
+def report_article():
+    article_id = request.form["article_id"]
+    reason = request.form["reason"]
+    user_id = session.get("user_id")
+    if not user_id:
+        flash("You must be logged in to report!", "danger")
+        return redirect(url_for("login_page"))
+
+    cursor.execute(
+        "INSERT INTO Reports (article_id, user_id, reason) VALUES (%s,%s,%s)",
+        (article_id, user_id, reason)
+    )
+    db.commit()
+
+    cursor.execute("SELECT COUNT(*) AS report_count FROM Reports WHERE article_id=%s", (article_id,))
+    report_data = cursor.fetchone()
+    report_count = report_data["report_count"] if report_data else 0
+    new_score = max(0, 100 - (report_count * 10))
+
+    cursor.execute("UPDATE Articles SET trust_score=%s WHERE article_id=%s", (new_score, article_id))
+    db.commit()
+
+    flash(f"Report submitted! Trust Score updated to {new_score}.", "success")
+    return redirect(url_for("home"))
 
 # -------------------
 # RUN APP
