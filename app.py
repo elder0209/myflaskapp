@@ -4,41 +4,46 @@ from datetime import date
 import requests
 from bs4 import BeautifulSoup
 import os
+import random
+from werkzeug.security import generate_password_hash, check_password_hash
 
 print("DB_HOST from env:", os.getenv("DB_HOST"))
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key_here"
+app.secret_key = os.getenv("FLASK_SECRET", "supersecretkey")  # Prefer env var
 
 # -------------------
 # MYSQL CONNECTION
 # -------------------
-try:
-    db = mysql.connector.connect(
-        host=os.getenv("DB_HOST"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASS"),
-        database=os.getenv("DB_NAME"),
-        connection_timeout=20
-    )
-    cursor = db.cursor(dictionary=True)
+def get_db_connection():
+    try:
+        db = mysql.connector.connect(
+            host=os.getenv("DB_HOST"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASS"),
+            database=os.getenv("DB_NAME"),
+            connection_timeout=20
+        )
+        cursor = db.cursor(dictionary=True)
 
-    # Apply safer session settings
-    for setting in [
-        "SET SESSION net_read_timeout = 600",
-        "SET SESSION net_write_timeout = 600",
-        "SET SESSION wait_timeout = 600",
-        "SET SESSION interactive_timeout = 600"
-    ]:
-        try:
-            cursor.execute(setting)
-        except Exception as e:
-            print(f"Warning: Could not apply setting {setting} - {e}")
+        # Safer session settings
+        for setting in [
+            "SET SESSION net_read_timeout = 600",
+            "SET SESSION net_write_timeout = 600",
+            "SET SESSION wait_timeout = 600",
+            "SET SESSION interactive_timeout = 600"
+        ]:
+            try:
+                cursor.execute(setting)
+            except Exception as e:
+                print(f"Warning: Could not apply setting {setting} - {e}")
 
-except mysql.connector.Error as err:
-    print("❌ Database connection failed:", err)
-    db = None
-    cursor = None
+        return db, cursor
+    except mysql.connector.Error as err:
+        print("❌ Database connection failed:", err)
+        return None, None
+
+db, cursor = get_db_connection()
 
 
 # -------------------
@@ -59,16 +64,14 @@ def fetch_article_text(url):
         return "Untitled Online Article", f"❌ Failed to fetch article: {e}"
 
     soup = BeautifulSoup(resp.text, "html.parser")
-
     title = soup.title.string.strip() if soup.title else "Untitled Online Article"
     paragraphs = [p.get_text(strip=True) for p in soup.find_all("p") if p.get_text(strip=True)]
     content = " ".join(paragraphs[:6]) if paragraphs else "⚠️ No content found"
-
     return title[:150], content[:800]
 
 
 # -------------------
-# HOME PAGE
+# ROUTES
 # -------------------
 @app.route("/")
 def home():
@@ -90,9 +93,6 @@ def home():
     )
 
 
-# -------------------
-# SIGNUP PAGE
-# -------------------
 @app.route("/signup_page")
 def signup_page():
     return render_template("signup.html")
@@ -104,26 +104,19 @@ def signup():
     email = request.form["email"]
     password = request.form["password"]
 
-    cursor.execute("SELECT * FROM Users WHERE name=%s", (name,))
+    cursor.execute("SELECT * FROM Users WHERE name=%s OR email=%s", (name, email))
     if cursor.fetchone():
-        flash("Username already in use!", "danger")
+        flash("Username or Email already in use!", "danger")
         return redirect(url_for("signup_page"))
 
-    cursor.execute("SELECT * FROM Users WHERE email=%s", (email,))
-    if cursor.fetchone():
-        flash("Email already in use!", "danger")
-        return redirect(url_for("signup_page"))
-
+    hashed_password = generate_password_hash(password)
     cursor.execute("INSERT INTO Users (name, email, password) VALUES (%s, %s, %s)",
-                   (name, email, password))
+                   (name, email, hashed_password))
     db.commit()
     flash("Signup successful! Please login.", "success")
     return redirect(url_for("login_page"))
 
 
-# -------------------
-# LOGIN
-# -------------------
 @app.route("/login_page")
 def login_page():
     return render_template("login.html")
@@ -134,13 +127,10 @@ def login_user():
     email = request.form["email"]
     password = request.form["password"]
 
-    cursor.execute(
-        "SELECT * FROM Users WHERE email=%s AND password=%s",
-        (email, password)
-    )
+    cursor.execute("SELECT * FROM Users WHERE email=%s", (email,))
     user = cursor.fetchone()
 
-    if user:
+    if user and check_password_hash(user["password"], password):
         session["user_id"] = user["user_id"]
         session["name"] = user["name"]
         return redirect(url_for("home"))
@@ -155,9 +145,6 @@ def logout():
     return redirect(url_for("login_page"))
 
 
-# -------------------
-# ADD ARTICLE MANUAL
-# -------------------
 @app.route("/add_article", methods=["POST"])
 def add_article():
     title = request.form["title"]
@@ -170,7 +157,8 @@ def add_article():
     source_id = source["source_id"] if source else 1
 
     cursor.execute(
-        "INSERT INTO Articles (title, content, url, publish_date, source_id, trust_score, source) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+        "INSERT INTO Articles (title, content, url, publish_date, source_id, trust_score, source) "
+        "VALUES (%s,%s,%s,%s,%s,%s,%s)",
         (title, content, url_link, publish_date, source_id, 50, "manual")
     )
     db.commit()
@@ -178,9 +166,6 @@ def add_article():
     return redirect(url_for("home"))
 
 
-# -------------------
-# CHECK TRUST (Saved)
-# -------------------
 @app.route("/check_trust", methods=["POST"])
 def check_trust():
     article_id = request.form["article_id"]
@@ -193,13 +178,9 @@ def check_trust():
     return redirect(url_for("home"))
 
 
-# -------------------
-# CHECK ONLINE NEWS
-# -------------------
 @app.route("/check_online", methods=["POST"])
 def check_online():
     url_link = request.form["url_link"]
-
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
         resp = requests.get(url_link, headers=headers, timeout=10)
@@ -207,35 +188,31 @@ def check_online():
 
         soup = BeautifulSoup(resp.text, "html.parser")
         title = soup.title.string if soup.title else "Untitled"
-        text = " ".join([p.get_text() for p in soup.find_all("p")[:3]])  # first 3 paras
+        text = " ".join([p.get_text() for p in soup.find_all("p")[:3]])
         snippet = text[:300] + "..." if len(text) > 300 else text
-
         score = random.randint(40, 95)
 
-        # ✅ Save in DB with source=online
-        cursor.execute("""
-            INSERT INTO Articles (title, content, url, publish_date, trust_score, source)
-            VALUES (%s, %s, %s, NOW(), %s, %s)
-        """, (title, snippet, url_link, score, "online"))
+        cursor.execute(
+            "INSERT INTO Articles (title, content, url, publish_date, trust_score, source) "
+            "VALUES (%s, %s, %s, NOW(), %s, %s)",
+            (title, snippet, url_link, score, "online")
+        )
         db.commit()
-
         flash(f"✅ Online article checked! Trust Score: {score}", "success")
-
     except Exception as e:
         flash(f"❌ Failed to fetch online article. Error: {str(e)}", "danger")
 
     return redirect(url_for("home"))
 
 
-
-# -------------------
-# REPORT ARTICLE
-# -------------------
 @app.route("/report_article", methods=["POST"])
 def report_article():
     article_id = request.form["article_id"]
     reason = request.form["reason"]
-    user_id = session["user_id"]
+    user_id = session.get("user_id")
+    if not user_id:
+        flash("You must be logged in to report!", "danger")
+        return redirect(url_for("login_page"))
 
     cursor.execute(
         "INSERT INTO Reports (article_id, user_id, reason) VALUES (%s,%s,%s)",
@@ -246,7 +223,6 @@ def report_article():
     cursor.execute("SELECT COUNT(*) AS report_count FROM Reports WHERE article_id=%s", (article_id,))
     report_data = cursor.fetchone()
     report_count = report_data["report_count"] if report_data else 0
-
     new_score = max(0, 100 - (report_count * 10))
 
     cursor.execute("UPDATE Articles SET trust_score=%s WHERE article_id=%s", (new_score, article_id))
@@ -260,8 +236,4 @@ def report_article():
 # RUN APP
 # -------------------
 if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=5000,
-        debug=True
-    )
+    app.run(host="0.0.0.0", port=5000, debug=True)
