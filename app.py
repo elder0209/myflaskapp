@@ -4,6 +4,7 @@ from datetime import date
 import requests
 from bs4 import BeautifulSoup
 import os
+import random
 
 print("DB_HOST from env:", os.getenv("DB_HOST"))
 
@@ -61,7 +62,10 @@ def home():
         name=session["name"],
         safe_news=safe_news,
         risky_news=risky_news,
-        today=date.today()
+        today=date.today(),
+        online_snippet=session.get("online_snippet"),
+        online_score=session.get("online_score"),
+        online_url=session.get("online_url")
     )
 
 
@@ -162,7 +166,7 @@ def add_article():
 
 
 # -------------------
-# CHECK TRUST SCORE
+# CHECK TRUST SCORE (Saved Articles)
 # -------------------
 @app.route("/check_trust", methods=["POST"])
 def check_trust():
@@ -185,19 +189,38 @@ def check_online():
     if not url_link:
         flash("Please provide a URL!", "warning")
         return redirect(url_for("home"))
+
     try:
-        r = requests.get(url_link)
+        r = requests.get(url_link, timeout=10)
+        r.raise_for_status()
         soup = BeautifulSoup(r.text, "html.parser")
-        text = soup.get_text(separator=' ', strip=True)[:500]
-        fake_keywords = ["fake", "hoax", "false"]
+
+        # Extract title & snippet
+        title = soup.title.string if soup.title else "Untitled"
+        paragraphs = " ".join([p.get_text() for p in soup.find_all("p")])
+        snippet = paragraphs[:300] if paragraphs else "No content found."
+
+        # Simple trust score logic
+        fake_keywords = ["fake", "hoax", "false", "rumor"]
         score = 100
         for word in fake_keywords:
-            if word in text.lower():
+            if word in paragraphs.lower():
                 score -= 30
         score = max(min(score, 100), 0)
-        flash(f"Online Article Trust Score (simple check): {score}", "info")
-    except:
-        flash("Failed to fetch online article.", "danger")
+
+        # Store in session for homepage preview
+        session["online_snippet"] = snippet
+        session["online_score"] = score
+        session["online_url"] = url_link
+
+        flash("Online article checked successfully!", "success")
+
+    except Exception as e:
+        flash(f"Failed to fetch online article. Error: {e}", "danger")
+        session.pop("online_snippet", None)
+        session.pop("online_score", None)
+        session.pop("online_url", None)
+
     return redirect(url_for("home"))
 
 
@@ -238,4 +261,5 @@ if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
         port=5000,
+        debug=True
     )
