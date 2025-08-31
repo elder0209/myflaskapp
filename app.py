@@ -185,6 +185,36 @@ def check_online():
         flash("Failed to fetch online article.", "danger")
     return redirect(url_for("home"))
 
+# -------------------
+# REPORT ARTICLE
+# -------------------
+@app.route("/report_article", methods=["POST"])
+def report_article():
+    article_id = request.form["article_id"]
+    reason = request.form["reason"]
+    user_id = session["user_id"]
+
+    # Insert report
+    cursor.execute(
+        "INSERT INTO Reports (article_id, user_id, reason) VALUES (%s,%s,%s)",
+        (article_id, user_id, reason)
+    )
+    db.commit()
+
+    # --- Recalculate Trust Score manually ---
+    cursor.execute("SELECT COUNT(*) AS report_count FROM Reports WHERE article_id=%s", (article_id,))
+    report_data = cursor.fetchone()
+    report_count = report_data["report_count"] if report_data else 0
+
+    # Simple formula: Start from 100, -10 per report (minimum 0)
+    new_score = max(0, 100 - (report_count * 10))
+
+    cursor.execute("UPDATE Articles SET trust_score=%s WHERE article_id=%s", (new_score, article_id))
+    db.commit()
+
+    flash(f"Report submitted! Trust Score updated to {new_score}.", "success")
+    return redirect(url_for("home"))
+
 if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
