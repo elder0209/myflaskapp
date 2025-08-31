@@ -191,8 +191,9 @@ def check_online():
         return redirect(url_for("home"))
 
     text = ""
+    title = ""
     try:
-        # --- Try with requests_html (handles JS + Cloudflare) ---
+        # --- Try with requests_html ---
         session_html = HTMLSession()
         headers = {
             "User-Agent": (
@@ -204,15 +205,19 @@ def check_online():
         r = session_html.get(url_link, headers=headers)
         r.html.render(timeout=20, sleep=2)
 
+        # Title
+        if r.html.find("title", first=True):
+            title = r.html.find("title", first=True).text[:150]
+
+        # Content
         paragraphs = r.html.find("p")
         text = " ".join(p.text for p in paragraphs if p.text)[:500]
-
         if not text.strip():
             text = r.html.text[:500]
 
     except Exception:
         try:
-            # --- Fallback: normal requests ---
+            # --- Fallback: requests + BeautifulSoup ---
             headers = {
                 "User-Agent": (
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -222,8 +227,9 @@ def check_online():
             }
             r = requests.get(url_link, headers=headers, timeout=15)
             soup = BeautifulSoup(r.text, "html.parser")
-            text = " ".join(p.get_text() for p in soup.find_all("p"))[:500]
 
+            title = soup.title.string[:150] if soup.title else "Untitled Online Article"
+            text = " ".join(p.get_text() for p in soup.find_all("p"))[:500]
         except Exception as e2:
             flash(f"Failed to fetch online article. Error: {str(e2)}", "danger")
             return redirect(url_for("home"))
@@ -236,12 +242,18 @@ def check_online():
             score -= 30
     score = max(min(score, 100), 0)
 
-    # save to session so homepage can show
-    session["online_snippet"] = text
-    session["online_score"] = score
-    session["online_url"] = url_link
+    # --- Save in DB ---
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("""
+        INSERT INTO Articles (title, content, url, publish_date, trust_score, source)
+        VALUES (%s, %s, %s, NOW(), %s, %s)
+    """, (title, text, url_link, score, "online"))
+    db.commit()
 
+    flash("Online article checked and stored!", "success")
     return redirect(url_for("home"))
+
 
 
 # -------------------
