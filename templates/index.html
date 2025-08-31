@@ -1,17 +1,19 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Fake News Detector</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
+<body class="bg-light">
+
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="#">Fake News Detector</a>
         <div class="collapse navbar-collapse">
             <ul class="navbar-nav ms-auto">
-                <li class="nav-item">
-                    <span class="navbar-text text-white me-3">Hello, {{ name }}</span>
+                <li class="nav-item text-white me-3">
+                    Hello, {{ name }}
                 </li>
                 <li class="nav-item">
                     <a class="btn btn-outline-light" href="{{ url_for('logout') }}">Logout</a>
@@ -23,28 +25,78 @@
 
 <div class="container mt-4">
 
+    <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-        {% for category, message in messages %}
+        {% for category, msg in messages %}
           <div class="alert alert-{{ category }} alert-dismissible fade show">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              {{ msg }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
           </div>
         {% endfor %}
       {% endif %}
     {% endwith %}
 
-    <h3 class="mb-3">Safe News</h3>
+    <!-- Submit Article -->
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">Submit an Article</div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('add_article') }}">
+                <input type="text" name="title" class="form-control mb-2" placeholder="Title" required>
+                <textarea name="content" class="form-control mb-2" placeholder="Content" required></textarea>
+                <input type="text" name="url" class="form-control mb-2" placeholder="URL">
+                <input type="date" name="publish_date" class="form-control mb-2" required>
+                <input type="submit" class="btn btn-success" value="Submit Article">
+            </form>
+        </div>
+    </div>
+
+    <!-- Report Fake News -->
+    <div class="card mb-4">
+        <div class="card-header bg-danger text-white">Report Fake News</div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('report_article') }}">
+                <input type="number" name="article_id" class="form-control mb-2" placeholder="Article ID" required>
+                <input type="text" name="reason" class="form-control mb-2" placeholder="Reason" required>
+                <input type="submit" class="btn btn-danger" value="Submit Report">
+            </form>
+        </div>
+    </div>
+
+    <!-- Detect Fake News -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">Detect Fake News (Check Trust Score)</div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('check_trust') }}">
+                <input type="number" name="article_id" class="form-control mb-2" placeholder="Enter Article ID" required>
+                <input type="submit" class="btn btn-primary" value="Check Trust">
+            </form>
+        </div>
+    </div>
+
+    <!-- Check Online Article -->
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">Check Online Article</div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('check_online') }}">
+                <input type="text" name="url_link" class="form-control mb-2" placeholder="Enter article URL" required>
+                <input type="submit" class="btn btn-warning" value="Check Online">
+            </form>
+        </div>
+    </div>
+
+    <!-- Safe News -->
+    <h4 class="mb-3">Safe News Articles</h4>
     <div class="row row-cols-1 row-cols-md-3 g-3 mb-4">
         {% for article in safe_news %}
         <div class="col">
-            <div class="card h-100 border-success">
+            <div class="card border-success h-100">
                 <div class="card-body">
                     <h5 class="card-title">{{ article.title }}</h5>
                     <p class="card-text">{{ article.content }}</p>
                 </div>
                 <div class="card-footer d-flex justify-content-between align-items-center">
-                    <small class="text-muted">Trust Score: {{ article.trust_score }}</small>
+                    <small class="text-success">Trust Score: {{ article.trust_score }}</small>
                     <a href="{{ article.url }}" target="_blank" class="btn btn-sm btn-success">Read</a>
                 </div>
             </div>
@@ -52,17 +104,18 @@
         {% endfor %}
     </div>
 
-    <h3 class="mb-3">Risky News</h3>
-    <div class="row row-cols-1 row-cols-md-3 g-3">
+    <!-- Risky News -->
+    <h4 class="mb-3">Risky News Articles</h4>
+    <div class="row row-cols-1 row-cols-md-3 g-3 mb-4">
         {% for article in risky_news %}
         <div class="col">
-            <div class="card h-100 border-danger">
+            <div class="card border-danger h-100">
                 <div class="card-body">
                     <h5 class="card-title">{{ article.title }}</h5>
                     <p class="card-text">{{ article.content }}</p>
                 </div>
                 <div class="card-footer d-flex justify-content-between align-items-center">
-                    <small class="text-muted">Trust Score: {{ article.trust_score }}</small>
+                    <small class="text-danger">Trust Score: {{ article.trust_score }}</small>
                     <a href="{{ article.url }}" target="_blank" class="btn btn-sm btn-danger">Read</a>
                 </div>
             </div>
