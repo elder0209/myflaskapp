@@ -1,5 +1,3 @@
-create database Detector
-use Detector
 
 -- ===============================
 -- 1. Users Table
@@ -22,6 +20,8 @@ CREATE TABLE Sources (
     source_name VARCHAR(200) UNIQUE NOT NULL,
     credibility_score DECIMAL(5,2) DEFAULT 50.00 CHECK (credibility_score BETWEEN 0 AND 100)
 );
+ALTER TABLE Articles ADD COLUMN source VARCHAR(50) DEFAULT 'manual';
+
 
 -- Insert default source to avoid FK errors
 INSERT INTO Sources (source_name, credibility_score) VALUES ('Default Source', 80);
