@@ -1,130 +1,214 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Fake News Detector</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f1f3f6;
+            font-family: Arial, sans-serif;
+        }
+
+        .video-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -2;
+        }
+
+        .heading {
+            color: white;
+            text-align: center;
+            justify-content: center;
+        }
+
+        .main-card {
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+            background-color: #fff;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .main-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .section-header {
+            background-color: #0d6efd;
+            color: #fff;
+            font-weight: 600;
+            font-size: 1.1rem;
+            padding: 10px 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .btn {
+            width: 100%;
+            margin-bottom: 15px;
+            transition: transform 0.3s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .table th {
+            background-color: #0d6efd;
+            color: white;
+        }
+
+        .logout-link {
+            text-decoration: none;
+            color: #dc3545;
+            font-weight: 500;
+        }
+
+        h2 {
+            font-weight: 700;
+        }
+
+        textarea.form-control {
+            resize: vertical;
+        }
+    </style>
 </head>
-<body class="bg-light">
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="#">Fake News Detector</a>
-        <div class="collapse navbar-collapse">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item text-white me-3">
-                    Hello, {{ name }}
-                </li>
-                <li class="nav-item">
-                    <a class="btn btn-outline-light" href="{{ url_for('logout') }}">Logout</a>
-                </li>
-            </ul>
+<body>
+    <video autoplay muted loop class="video-bg">
+        <source src="6913745_Motion_Graphics_Motion_Graphic_3840x2160.mp4" type="video/mp4">
+    </video>
+    <div class="container mt-4">
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <p style="color: white;">Hello, {{ name }} | <a href="{{ url_for('logout') }}"
+                    class="logout-link">Logout</a></p>
         </div>
-    </div>
-</nav>
 
-<div class="container mt-4">
-
-    <!-- Flash Messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
         {% for category, msg in messages %}
-          <div class="alert alert-{{ category }} alert-dismissible fade show">
-              {{ msg }}
-              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-          </div>
+        <div class="alert alert-{{ category }}">{{ msg }}</div>
         {% endfor %}
-      {% endif %}
-    {% endwith %}
+        {% endif %}
+        {% endwith %}
 
-    <!-- Submit Article -->
-    <div class="card mb-4">
-        <div class="card-header bg-success text-white">Submit an Article</div>
-        <div class="card-body">
+        <!-- All Forms and Tables in One Box -->
+        <div class="main-card">
+            <h2 style="text-align: center; color: red; padding-bottom: 40px;">Fake News Detector</h2>
+
+            <!-- Submit Article -->
+            <div class="section-header">Submit an Article</div>
             <form method="POST" action="{{ url_for('add_article') }}">
                 <input type="text" name="title" class="form-control mb-2" placeholder="Title" required>
                 <textarea name="content" class="form-control mb-2" placeholder="Content" required></textarea>
                 <input type="text" name="url" class="form-control mb-2" placeholder="URL">
-                <input type="date" name="publish_date" class="form-control mb-2" required>
+                <input type="date" name="publish_date" class="form-control mb-3" required>
                 <input type="submit" class="btn btn-success" value="Submit Article">
             </form>
-        </div>
-    </div>
 
-    <!-- Report Fake News -->
-    <div class="card mb-4">
-        <div class="card-header bg-danger text-white">Report Fake News</div>
-        <div class="card-body">
+            <!-- Report Fake News -->
+            <div class="section-header">Report Fake News</div>
             <form method="POST" action="{{ url_for('report_article') }}">
                 <input type="number" name="article_id" class="form-control mb-2" placeholder="Article ID" required>
-                <input type="text" name="reason" class="form-control mb-2" placeholder="Reason" required>
+                <input type="text" name="reason" class="form-control mb-3" placeholder="Reason" required>
                 <input type="submit" class="btn btn-danger" value="Submit Report">
             </form>
-        </div>
-    </div>
 
-    <!-- Detect Fake News -->
-    <div class="card mb-4">
-        <div class="card-header bg-primary text-white">Detect Fake News (Check Trust Score)</div>
-        <div class="card-body">
+            <!-- Detect Fake News -->
+            <div class="section-header">Detect Fake News</div>
             <form method="POST" action="{{ url_for('check_trust') }}">
-                <input type="number" name="article_id" class="form-control mb-2" placeholder="Enter Article ID" required>
+                <input type="number" name="article_id" class="form-control mb-3" placeholder="Enter Article ID"
+                    required>
                 <input type="submit" class="btn btn-primary" value="Check Trust">
             </form>
-        </div>
-    </div>
 
-    <!-- Check Online Article -->
-    <div class="card mb-4">
-        <div class="card-header bg-warning text-dark">Check Online Article</div>
-        <div class="card-body">
+            <!-- Check Online Article -->
+            <div class="section-header">Check Online Article</div>
             <form method="POST" action="{{ url_for('check_online') }}">
-                <input type="text" name="url_link" class="form-control mb-2" placeholder="Enter article URL" required>
+                <input type="text" name="url_link" class="form-control mb-3" placeholder="Enter article URL" required>
                 <input type="submit" class="btn btn-warning" value="Check Online">
             </form>
+
+            <!-- Safe News Articles -->
+            <div class="section-header">Safe News Articles</div>
+            <table class="table table-bordered mb-4">
+                <tr>
+                    <th>ID</th>
+                    <th>Title</th>
+                    <th>Trust Score</th>
+                    <th>Publish Date</th>
+                </tr>
+                {% for article in safe_news %}
+                <tr>
+                    <td>{{ article.article_id }}</td>
+                    <td>{{ article.title }}</td>
+                    <td>{{ article.trust_score }}</td>
+                    <td>{{ article.publish_date }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+
+            <!-- Risky News Articles -->
+            <div class="section-header">Risky News Articles</div>
+            <table class="table table-bordered mb-4">
+                <tr>
+                    <th>ID</th>
+                    <th>Title</th>
+                    <th>Trust Score</th>
+                    <th>Publish Date</th>
+                </tr>
+                {% for article in risky_news %}
+                <tr>
+                    <td>{{ article.article_id }}</td>
+                    <td>{{ article.title }}</td>
+                    <td>{{ article.trust_score }}</td>
+                    <td>{{ article.publish_date }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+
+            <!-- Latest Online News -->
+            <div class="section-header">Latest Online News</div>
+            <table class="table table-bordered">
+                <tr>
+                    <th>ID</th>
+                    <th>Title</th>
+                    <th>Trust Score</th>
+                    <th>Link</th>
+                    <th>Date</th>
+                </tr>
+                {% if latest_online %}
+                {% for news in latest_online %}
+                <tr>
+                    <td>{{ news.id }}</td>
+                    <td>{{ news.title }}</td>
+                    <td>{{ news.trust_score }}</td>
+                    <td><a href="{{ news.url }}" target="_blank">Read</a></td>
+                    <td>{{ news.date }}</td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center">No latest online news available.</td>
+                </tr>
+                {% endif %}
+            </table>
+
         </div>
+
     </div>
 
-    <!-- Safe News -->
-    <h4 class="mb-3">Safe News Articles</h4>
-    <div class="row row-cols-1 row-cols-md-3 g-3 mb-4">
-        {% for article in safe_news %}
-        <div class="col">
-            <div class="card border-success h-100">
-                <div class="card-body">
-                    <h5 class="card-title">{{ article.title }}</h5>
-                    <p class="card-text">{{ article.content }}</p>
-                </div>
-                <div class="card-footer d-flex justify-content-between align-items-center">
-                    <small class="text-success">Trust Score: {{ article.trust_score }}</small>
-                    <a href="{{ article.url }}" target="_blank" class="btn btn-sm btn-success">Read</a>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-
-    <!-- Risky News -->
-    <h4 class="mb-3">Risky News Articles</h4>
-    <div class="row row-cols-1 row-cols-md-3 g-3 mb-4">
-        {% for article in risky_news %}
-        <div class="col">
-            <div class="card border-danger h-100">
-                <div class="card-body">
-                    <h5 class="card-title">{{ article.title }}</h5>
-                    <p class="card-text">{{ article.content }}</p>
-                </div>
-                <div class="card-footer d-flex justify-content-between align-items-center">
-                    <small class="text-danger">Trust Score: {{ article.trust_score }}</small>
-                    <a href="{{ article.url }}" target="_blank" class="btn btn-sm btn-danger">Read</a>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
 </html>
