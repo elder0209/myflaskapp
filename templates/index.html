@@ -79,6 +79,87 @@
         textarea.form-control {
             resize: vertical;
         }
+
+        /* ---------------- CHATBOT ---------------- */
+        #chatbot-btn {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 30px;
+            cursor: pointer;
+            z-index: 9999;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+        }
+
+        #chatbot-box {
+            position: fixed;
+            bottom: 100px;
+            right: 25px;
+            width: 300px;
+            max-height: 400px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 6px 25px rgba(0,0,0,0.3);
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 9998;
+        }
+
+        #chatbot-header {
+            background-color: #0d6efd;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        #chatbot-messages {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+            font-size: 14px;
+        }
+
+        #chatbot-input {
+            display: flex;
+            border-top: 1px solid #ccc;
+        }
+
+        #chatbot-input input {
+            flex: 1;
+            border: none;
+            padding: 10px;
+            outline: none;
+        }
+
+        #chatbot-input button {
+            border: none;
+            background-color: #0d6efd;
+            color: white;
+            padding: 10px 15px;
+            cursor: pointer;
+        }
+
+        .chat-msg {
+            margin-bottom: 8px;
+        }
+
+        .chat-msg.user {
+            text-align: right;
+            font-weight: 500;
+        }
+
+        .chat-msg.bot {
+            text-align: left;
+            font-weight: 500;
+        }
     </style>
 </head>
 
@@ -87,129 +168,152 @@
     <source src="{{ url_for('static', filename='videos/6913745_Motion_Graphics_Motion_Graphic_3840x2160.mp4') }}" type="video/mp4">
 </video>
 
-    <div class="container mt-4">
-
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <p style="color: white;">Hello, {{ name }} | <a href="{{ url_for('logout') }}"
-                    class="logout-link">Logout</a></p>
-        </div>
-
-        <!-- Flash Messages -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        {% for category, msg in messages %}
-        <div class="alert alert-{{ category }}">{{ msg }}</div>
-        {% endfor %}
-        {% endif %}
-        {% endwith %}
-
-        <!-- All Forms and Tables in One Box -->
-        <div class="main-card">
-            <h2 style="text-align: center; color: red; padding-bottom: 40px;">Fake News Detector</h2>
-
-            <!-- Submit Article -->
-            <div class="section-header">Submit an Article</div>
-            <form method="POST" action="{{ url_for('add_article') }}">
-                <input type="text" name="title" class="form-control mb-2" placeholder="Title" required>
-                <textarea name="content" class="form-control mb-2" placeholder="Content" required></textarea>
-                <input type="text" name="url" class="form-control mb-2" placeholder="URL">
-                <input type="date" name="publish_date" class="form-control mb-3" required>
-                <input type="submit" class="btn btn-success" value="Submit Article">
-            </form>
-
-            <!-- Report Fake News -->
-            <div class="section-header">Report Fake News</div>
-            <form method="POST" action="{{ url_for('report_article') }}">
-                <input type="number" name="article_id" class="form-control mb-2" placeholder="Article ID" required>
-                <input type="text" name="reason" class="form-control mb-3" placeholder="Reason" required>
-                <input type="submit" class="btn btn-danger" value="Submit Report">
-            </form>
-
-            <!-- Detect Fake News -->
-            <div class="section-header">Detect Fake News</div>
-            <form method="POST" action="{{ url_for('check_trust') }}">
-                <input type="number" name="article_id" class="form-control mb-3" placeholder="Enter Article ID"
-                    required>
-                <input type="submit" class="btn btn-primary" value="Check Trust">
-            </form>
-
-            <!-- Check Online Article -->
-            <div class="section-header">Check Online Article</div>
-            <form method="POST" action="{{ url_for('check_online') }}">
-                <input type="text" name="url_link" class="form-control mb-3" placeholder="Enter article URL" required>
-                <input type="submit" class="btn btn-warning" value="Check Online">
-            </form>
-
-            <!-- Safe News Articles -->
-            <div class="section-header">Safe News Articles</div>
-            <table class="table table-bordered mb-4">
-                <tr>
-                    <th>ID</th>
-                    <th>Title</th>
-                    <th>Trust Score</th>
-                    <th>Publish Date</th>
-                </tr>
-                {% for article in safe_news %}
-                <tr>
-                    <td>{{ article.article_id }}</td>
-                    <td>{{ article.title }}</td>
-                    <td>{{ article.trust_score }}</td>
-                    <td>{{ article.publish_date }}</td>
-                </tr>
-                {% endfor %}
-            </table>
-
-            <!-- Risky News Articles -->
-            <div class="section-header">Risky News Articles</div>
-            <table class="table table-bordered mb-4">
-                <tr>
-                    <th>ID</th>
-                    <th>Title</th>
-                    <th>Trust Score</th>
-                    <th>Publish Date</th>
-                </tr>
-                {% for article in risky_news %}
-                <tr>
-                    <td>{{ article.article_id }}</td>
-                    <td>{{ article.title }}</td>
-                    <td>{{ article.trust_score }}</td>
-                    <td>{{ article.publish_date }}</td>
-                </tr>
-                {% endfor %}
-            </table>
-
-            <!-- Latest Online News -->
-            <div class="section-header">Latest Online News</div>
-            <table class="table table-bordered">
-                <tr>
-                    <th>ID</th>
-                    <th>Title</th>
-                    <th>Trust Score</th>
-                    <th>Link</th>
-                    <th>Date</th>
-                </tr>
-                {% if latest_online %}
-                {% for news in latest_online %}
-                <tr>
-                    <td>{{ news.id }}</td>
-                    <td>{{ news.title }}</td>
-                    <td>{{ news.trust_score }}</td>
-                    <td><a href="{{ news.url }}" target="_blank">Read</a></td>
-                    <td>{{ news.date }}</td>
-                </tr>
-                {% endfor %}
-                {% else %}
-                <tr>
-                    <td colspan="5" class="text-center">No latest online news available.</td>
-                </tr>
-                {% endif %}
-            </table>
-
-        </div>
-
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <p style="color: white;">Hello, {{ name }} | <a href="{{ url_for('logout') }}" class="logout-link">Logout</a></p>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-</body>
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, msg in messages %}
+    <div class="alert alert-{{ category }}">{{ msg }}</div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
 
+    <!-- Main Card -->
+    <div class="main-card">
+        <h2 style="text-align: center; color: red; padding-bottom: 40px;">Fake News Detector</h2>
+
+        <!-- Submit Article -->
+        <div class="section-header">Submit an Article</div>
+        <form method="POST" action="{{ url_for('add_article') }}">
+            <input type="text" name="title" class="form-control mb-2" placeholder="Title" required>
+            <textarea name="content" class="form-control mb-2" placeholder="Content" required></textarea>
+            <input type="text" name="url" class="form-control mb-2" placeholder="URL">
+            <input type="date" name="publish_date" class="form-control mb-3" required>
+            <input type="submit" class="btn btn-success" value="Submit Article">
+        </form>
+
+        <!-- Report Fake News -->
+        <div class="section-header">Report Fake News</div>
+        <form method="POST" action="{{ url_for('report_article') }}">
+            <input type="number" name="article_id" class="form-control mb-2" placeholder="Article ID" required>
+            <input type="text" name="reason" class="form-control mb-3" placeholder="Reason" required>
+            <input type="submit" class="btn btn-danger" value="Submit Report">
+        </form>
+
+        <!-- Detect Fake News -->
+        <div class="section-header">Detect Fake News</div>
+        <form method="POST" action="{{ url_for('check_trust') }}">
+            <input type="number" name="article_id" class="form-control mb-3" placeholder="Enter Article ID" required>
+            <input type="submit" class="btn btn-primary" value="Check Trust">
+        </form>
+
+        <!-- Check Online Article -->
+        <div class="section-header">Check Online Article</div>
+        <form method="POST" action="{{ url_for('check_online') }}">
+            <input type="text" name="url_link" class="form-control mb-3" placeholder="Enter article URL" required>
+            <input type="submit" class="btn btn-warning" value="Check Online">
+        </form>
+
+        <!-- Safe News Articles -->
+        <div class="section-header">Safe News Articles</div>
+        <table class="table table-bordered mb-4">
+            <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Trust Score</th>
+                <th>Publish Date</th>
+            </tr>
+            {% for article in safe_news %}
+            <tr>
+                <td>{{ article.article_id }}</td>
+                <td>{{ article.title }}</td>
+                <td>{{ article.trust_score }}</td>
+                <td>{{ article.publish_date }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+
+        <!-- Risky News Articles -->
+        <div class="section-header">Risky News Articles</div>
+        <table class="table table-bordered mb-4">
+            <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Trust Score</th>
+                <th>Publish Date</th>
+            </tr>
+            {% for article in risky_news %}
+            <tr>
+                <td>{{ article.article_id }}</td>
+                <td>{{ article.title }}</td>
+                <td>{{ article.trust_score }}</td>
+                <td>{{ article.publish_date }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+
+<!-- ---------------- CHATBOT ---------------- -->
+<button id="chatbot-btn">💬</button>
+<div id="chatbot-box">
+    <div id="chatbot-header">AI Helper</div>
+    <div id="chatbot-messages"></div>
+    <div id="chatbot-input">
+        <input type="text" id="chatbot-text" placeholder="Type your message...">
+        <button id="chatbot-send">Send</button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const chatbotBtn = document.getElementById("chatbot-btn");
+    const chatbotBox = document.getElementById("chatbot-box");
+    const chatbotMessages = document.getElementById("chatbot-messages");
+    const chatbotText = document.getElementById("chatbot-text");
+    const chatbotSend = document.getElementById("chatbot-send");
+
+    chatbotBtn.addEventListener("click", () => {
+        chatbotBox.style.display = chatbotBox.style.display === "flex" ? "none" : "flex";
+        chatbotBox.style.flexDirection = "column";
+    });
+
+    function addMessage(msg, sender) {
+        const div = document.createElement("div");
+        div.className = "chat-msg " + sender;
+        div.textContent = msg;
+        chatbotMessages.appendChild(div);
+        chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+    }
+
+    chatbotSend.addEventListener("click", async () => {
+        const message = chatbotText.value.trim();
+        if (!message) return;
+        addMessage(message, "user");
+        chatbotText.value = "";
+
+        try {
+            const res = await fetch("/chatbot", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({message})
+            });
+            const data = await res.json();
+            addMessage(data.reply, "bot");
+        } catch (err) {
+            addMessage("⚠️ Error contacting AI", "bot");
+        }
+    });
+
+    // Send on Enter key
+    chatbotText.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") chatbotSend.click();
+    });
+</script>
+
+</body>
 </html>
