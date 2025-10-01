@@ -11,3 +11,8 @@ Flask-OAuthlib
 google-auth
 google-auth-oauthlib
 authlib
+werkzeug
+transformers
+torch
+sentencepiece
+
