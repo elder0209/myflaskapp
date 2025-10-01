@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, session, flash, url_for
+from flask import Flask, render_template, request, redirect, session, flash, url_for, jsonify
 import mysql.connector
 from datetime import date
 import requests
@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 import os
 import random
 from werkzeug.security import generate_password_hash, check_password_hash
+from transformers import pipeline
 
 print("DB_HOST from env:", os.getenv("DB_HOST"))
 
@@ -209,6 +210,28 @@ def report_article():
 
     flash(f"Report submitted! Trust Score updated to {new_score}.", "success")
     return redirect(url_for("home"))
+
+# -------------------
+# AI CHATBOT ROUTE (HuggingFace DialoGPT)
+# -------------------
+print("Loading AI chatbot model... (this may take some time)")
+chatbot_model = pipeline("text-generation", model="microsoft/DialoGPT-small")
+
+@app.route("/chatbot", methods=["POST"])
+def chatbot():
+    user_message = request.json.get("message", "")
+
+    try:
+        response = chatbot_model(user_message, max_length=200, pad_token_id=50256)
+        reply = response[0]['generated_text']
+
+        # Truncate if too long
+        if len(reply) > 300:
+            reply = reply[:300] + "..."
+    except Exception as e:
+        reply = f"⚠️ AI Error: {str(e)}"
+
+    return jsonify({"reply": reply})
 
 # -------------------
 # RUN APP
