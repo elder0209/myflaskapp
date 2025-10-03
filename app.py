@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, session, flash, url_for, jsonify
+pfrom flask import Flask, render_template, request, redirect, session, flash, url_for, jsonify
 import mysql.connector
 from datetime import date
 import requests
