@@ -10,16 +10,15 @@ from werkzeug.security import generate_password_hash, check_password_hash
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "supersecretkey")
 
-# -------------------
-# MYSQL CONNECTION (Safe version)
-# -------------------
+
+# ------------------- DATABASE CONNECTION -------------------
 def get_db_connection():
     try:
         db = mysql.connector.connect(
-            host=os.getenv("DB_HOST"),
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASS"),
-            database=os.getenv("DB_NAME"),
+            host=os.getenv("DB_HOST", "localhost"),
+            user=os.getenv("DB_USER", "root"),
+            password=os.getenv("DB_PASS", ""),
+            database=os.getenv("DB_NAME", "fake_news_db"),
             connection_timeout=10
         )
         cursor = db.cursor(dictionary=True)
@@ -29,9 +28,7 @@ def get_db_connection():
         return None, None
 
 
-# -------------------
-# UTILS: FETCH ARTICLE
-# -------------------
+# ------------------- SCRAPING UTILITY -------------------
 def fetch_article_text(url):
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
@@ -47,9 +44,7 @@ def fetch_article_text(url):
     return title[:150], content[:800]
 
 
-# -------------------
-# ROUTES
-# -------------------
+# ------------------- ROUTES -------------------
 @app.route("/")
 def home():
     if "user_id" not in session:
@@ -78,9 +73,7 @@ def home():
     )
 
 
-# -------------------
-# SIGNUP / LOGIN
-# -------------------
+# ------------------- AUTHENTICATION -------------------
 @app.route("/signup_page")
 def signup_page():
     return render_template("signup.html")
@@ -105,8 +98,10 @@ def signup():
         return redirect(url_for("signup_page"))
 
     hashed_password = generate_password_hash(password)
-    cursor.execute("INSERT INTO Users (name, email, password) VALUES (%s, %s, %s)",
-                   (name, email, hashed_password))
+    cursor.execute(
+        "INSERT INTO Users (name, email, password) VALUES (%s, %s, %s)",
+        (name, email, hashed_password)
+    )
     db.commit()
 
     cursor.close()
@@ -155,9 +150,7 @@ def logout():
     return redirect(url_for("login_page"))
 
 
-# -------------------
-# ARTICLE / REPORT ROUTES
-# -------------------
+# ------------------- ARTICLES -------------------
 @app.route("/add_article", methods=["POST"])
 def add_article():
     title = request.form["title"]
@@ -268,9 +261,7 @@ def report_article():
     return redirect(url_for("home"))
 
 
-# -------------------
-# RUN APP
-# -------------------
+# ------------------- RUN APP -------------------
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 10000))  # Render/Railway default port
-    app.run(host="0.0.0.0", port=port, debug=False)
+    port = int(os.getenv("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
