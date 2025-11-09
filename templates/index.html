@@ -3,12 +3,14 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Fake News Detector</title>
+    <title>AI Fake News Analyzer</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         body {
-            background-color: #f1f3f6;
-            font-family: Arial, sans-serif;
+            font-family: "Poppins", sans-serif;
+            color: #fff;
+            overflow-x: hidden;
         }
 
         .video-bg {
@@ -18,160 +20,232 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
+            z-index: -3;
+            filter: brightness(0.35);
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            backdrop-filter: blur(12px);
+            background: rgba(0, 0, 0, 0.35);
             z-index: -2;
         }
 
-        .main-card {
-            border-radius: 15px;
+        .card-glass {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
             padding: 25px;
-            margin-bottom: 30px;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-            background-color: #fff;
-            transition: transform 0.3s, box-shadow 0.3s;
+            backdrop-filter: blur(15px);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
 
-        .main-card:hover {
+        .card-glass:hover {
             transform: translateY(-5px);
-            box-shadow: 0 12px 25px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 10px 25px rgba(255, 255, 255, 0.1);
         }
 
         .section-header {
-            background-color: #0d6efd;
-            color: #fff;
             font-weight: 600;
-            font-size: 1.1rem;
-            padding: 10px 15px;
-            border-radius: 10px;
+            font-size: 1.2rem;
+            color: #0dcaf0;
             margin-bottom: 15px;
         }
 
+        .trust-bar {
+            height: 10px;
+            border-radius: 5px;
+            background-color: #444;
+        }
+
+        .trust-bar-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.5s, background-color 0.5s;
+        }
+
+        .logout-link {
+            color: #ff6b6b;
+            text-decoration: none;
+        }
+
+        .logout-link:hover {
+            text-decoration: underline;
+        }
+
         .btn {
-            width: 100%;
-            margin-bottom: 15px;
             transition: transform 0.3s;
         }
 
         .btn:hover {
-            transform: translateY(-2px);
-        }
-
-        .table th {
-            background-color: #0d6efd;
-            color: white;
-        }
-
-        .logout-link {
-            text-decoration: none;
-            color: #dc3545;
-            font-weight: 500;
+            transform: scale(1.05);
         }
 
         h2 {
             font-weight: 700;
+            text-align: center;
+            color: #0dcaf0;
+            margin-bottom: 30px;
         }
 
-        textarea.form-control {
-            resize: vertical;
+        .dark-mode {
+            filter: invert(1) hue-rotate(180deg);
+        }
+
+        .toggle-mode {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            z-index: 1000;
+            cursor: pointer;
+            font-size: 1.6rem;
+            color: #0dcaf0;
         }
     </style>
 </head>
 
 <body>
-    <!-- ✅ Correct video source path -->
     <video autoplay muted loop class="video-bg">
         <source src="{{ url_for('static', filename='video/bg.mp4') }}" type="video/mp4">
     </video>
+    <div class="overlay"></div>
 
-    <div class="container mt-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <p style="color: white;">Hello, {{ name }} | <a href="{{ url_for('logout') }}"
-                    class="logout-link">Logout</a></p>
+    <i id="modeToggle" class="bi bi-moon-stars toggle-mode" title="Toggle Dark Mode"></i>
+
+    <div class="container mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-4 text-white">
+            <p>Hello, {{ name }} 👋 | <a href="{{ url_for('logout') }}" class="logout-link">Logout</a></p>
+            <small>{{ today }}</small>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
         {% for category, msg in messages %}
-        <div class="alert alert-{{ category }}">{{ msg }}</div>
+        <div class="alert alert-{{ category }} fade show">{{ msg }}</div>
         {% endfor %}
         {% endif %}
         {% endwith %}
 
-        <div class="main-card">
-            <h2 style="text-align: center; color: red; padding-bottom: 40px;">Fake News Detector</h2>
+        <div class="card-glass mb-4">
+            <h2>🧠 AI Fake News Analyzer</h2>
 
-            <!-- Submit Article -->
-            <div class="section-header">Submit an Article</div>
+            <!-- Add Article -->
+            <div class="section-header"><i class="bi bi-pencil-square"></i> Submit an Article</div>
             <form method="POST" action="{{ url_for('add_article') }}">
                 <input type="text" name="title" class="form-control mb-2" placeholder="Title" required>
-                <textarea name="content" class="form-control mb-2" placeholder="Content" required></textarea>
-                <input type="text" name="url" class="form-control mb-2" placeholder="URL">
+                <textarea name="content" class="form-control mb-2" placeholder="Content" rows="3" required></textarea>
+                <input type="text" name="url" class="form-control mb-2" placeholder="URL (optional)">
                 <input type="date" name="publish_date" class="form-control mb-3" required>
-                <input type="submit" class="btn btn-success" value="Submit Article">
+                <input type="submit" class="btn btn-success w-100" value="Submit Article">
             </form>
 
             <!-- Report Fake News -->
-            <div class="section-header">Report Fake News</div>
+            <div class="section-header mt-4"><i class="bi bi-flag"></i> Report Fake News</div>
             <form method="POST" action="{{ url_for('report_article') }}">
                 <input type="number" name="article_id" class="form-control mb-2" placeholder="Article ID" required>
                 <input type="text" name="reason" class="form-control mb-3" placeholder="Reason" required>
-                <input type="submit" class="btn btn-danger" value="Submit Report">
+                <input type="submit" class="btn btn-danger w-100" value="Submit Report">
             </form>
 
             <!-- Detect Fake News -->
-            <div class="section-header">Detect Fake News</div>
+            <div class="section-header mt-4"><i class="bi bi-search"></i> Detect Fake News</div>
             <form method="POST" action="{{ url_for('check_trust') }}">
                 <input type="number" name="article_id" class="form-control mb-3" placeholder="Enter Article ID" required>
-                <input type="submit" class="btn btn-primary" value="Check Trust">
+                <input type="submit" class="btn btn-primary w-100" value="Check Trust">
             </form>
 
             <!-- Check Online Article -->
-            <div class="section-header">Check Online Article</div>
+            <div class="section-header mt-4"><i class="bi bi-globe"></i> Check Online Article</div>
             <form method="POST" action="{{ url_for('check_online') }}">
-                <input type="text" name="url_link" class="form-control mb-3" placeholder="Enter article URL" required>
-                <input type="submit" class="btn btn-warning" value="Check Online">
+                <input type="text" name="url_link" class="form-control mb-3" placeholder="Enter Article URL" required>
+                <input type="submit" class="btn btn-warning w-100" value="Analyze URL">
             </form>
-
-            <!-- Safe News -->
-            <div class="section-header">Safe News Articles</div>
-            <table class="table table-bordered mb-4">
-                <tr>
-                    <th>ID</th>
-                    <th>Title</th>
-                    <th>Trust Score</th>
-                    <th>Publish Date</th>
-                </tr>
-                {% for article in safe_news %}
-                <tr>
-                    <td>{{ article.article_id }}</td>
-                    <td>{{ article.title }}</td>
-                    <td>{{ article.trust_score }}</td>
-                    <td>{{ article.publish_date }}</td>
-                </tr>
-                {% endfor %}
-            </table>
-
-            <!-- Risky News -->
-            <div class="section-header">Risky News Articles</div>
-            <table class="table table-bordered mb-4">
-                <tr>
-                    <th>ID</th>
-                    <th>Title</th>
-                    <th>Trust Score</th>
-                    <th>Publish Date</th>
-                </tr>
-                {% for article in risky_news %}
-                <tr>
-                    <td>{{ article.article_id }}</td>
-                    <td>{{ article.title }}</td>
-                    <td>{{ article.trust_score }}</td>
-                    <td>{{ article.publish_date }}</td>
-                </tr>
-                {% endfor %}
-            </table>
-
         </div>
+
+        <!-- Safe News Section -->
+        <div class="card-glass mb-4">
+            <div class="section-header"><i class="bi bi-shield-check"></i> Safe News Articles</div>
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Trust</th>
+                            <th>Publish Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for article in safe_news %}
+                        <tr>
+                            <td>{{ article.article_id }}</td>
+                            <td>{{ article.title }}</td>
+                            <td>
+                                <div class="trust-bar">
+                                    <div class="trust-bar-fill"
+                                        style="width: {{ article.trust_score }}%; background-color: hsl({{ article.trust_score }}, 100%, 40%);">
+                                    </div>
+                                </div>
+                                <small>{{ article.trust_score }}%</small>
+                            </td>
+                            <td>{{ article.publish_date }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Risky News Section -->
+        <div class="card-glass mb-4">
+            <div class="section-header"><i class="bi bi-exclamation-triangle"></i> Risky News Articles</div>
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Trust</th>
+                            <th>Publish Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for article in risky_news %}
+                        <tr>
+                            <td>{{ article.article_id }}</td>
+                            <td>{{ article.title }}</td>
+                            <td>
+                                <div class="trust-bar">
+                                    <div class="trust-bar-fill"
+                                        style="width: {{ article.trust_score }}%; background-color: hsl({{ article.trust_score }}, 100%, 40%);">
+                                    </div>
+                                </div>
+                                <small>{{ article.trust_score }}%</small>
+                            </td>
+                            <td>{{ article.publish_date }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const toggle = document.getElementById('modeToggle');
+        let dark = false;
+        toggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            dark = !dark;
+            toggle.className = dark ? "bi bi-brightness-high toggle-mode" : "bi bi-moon-stars toggle-mode";
+        });
+    </script>
 </body>
+
 </html>
