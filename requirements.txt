@@ -1,29 +1,20 @@
-# ---- Core Framework ----
 Flask
 Flask-JWT-Extended
 Flask-OAuthlib
 Werkzeug
 gunicorn
 python-dotenv
-
-# ---- Database ----
 mysql-connector-python
-
-# ---- Web & Scraping ----
 requests
 beautifulsoup4
 requests-html
 lxml_html_clean
 newspaper3k
 cloudscraper
-
-# ---- AI / NLP ----
 transformers
 torch
 sentencepiece
 openai
-
-# ---- Authentication & Google OAuth ----
 google-auth
 google-auth-oauthlib
 authlib
