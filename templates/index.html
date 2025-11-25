@@ -151,7 +151,8 @@
 
             <!-- Report Fake News -->
             <div class="section-header mt-4"><i class="bi bi-flag"></i> Report Fake News</div>
-            <form method="POST" action="{{ url_for('report_article') }}">
+            <form method="POST" action="{{ url_for('add_article') }}">
+
                 <input type="number" name="article_id" class="form-control mb-2" placeholder="Article ID" required>
                 <input type="text" name="reason" class="form-control mb-3" placeholder="Reason" required>
                 <button class="btn btn-danger w-100" type="submit">Submit Report</button>
