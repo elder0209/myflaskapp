@@ -43,7 +43,6 @@ def simple_score(text):
         return 30
     score = 50
 
-    # very basic heuristics
     low = text.lower()
     bad_words = ["shocking", "fake", "click", "scam", "you won't believe"]
 
@@ -92,8 +91,13 @@ def home():
     safe = [a for a in arts if a["trust_score"] >= 60]
     risky = [a for a in arts if a["trust_score"] < 60]
 
-    return render_template("index.html", safe_news=safe, risky_news=risky,
-                           name=session.get("name"), today=date.today())
+    return render_template(
+        "index.html",
+        safe_news=safe,
+        risky_news=risky,
+        name=session.get("name"),
+        today=date.today()
+    )
 
 # ------------ Signup ------------
 @app.route("/signup_page")
@@ -118,6 +122,7 @@ def signup():
     )
     conn.commit()
     conn.close()
+
     flash("Signup successful", "success")
     return redirect(url_for("login_page"))
 
