@@ -114,7 +114,7 @@ def signup():
         return redirect(url_for("signup_page"))
 
     cur.execute(
-        "INSERT INTO Users (name,email,password,created_at) VALUES (%s,%s,%s,NOW())",
+        "INSERT INTO Users (name,email,password) VALUES (%s,%s,%s)",
         (name, email, password)
     )
     conn.commit()
@@ -157,8 +157,8 @@ def add_article():
 
     conn, cur = get_db()
     cur.execute(
-        "INSERT INTO Articles (title,content,url,publish_date,trust_score,created_at)"
-        " VALUES (%s,%s,%s,%s,%s,NOW())",
+        "INSERT INTO Articles (title,content,url,publish_date,trust_score)"
+        " VALUES (%s,%s,%s,%s,%s)",
         (title, content, url, date_p, score)
     )
     conn.commit()
@@ -177,8 +177,8 @@ def check_online():
 
     conn, cur = get_db()
     cur.execute(
-        "INSERT INTO Articles (title,content,url,publish_date,trust_score,created_at)"
-        " VALUES (%s,%s,%s,NOW(),%s,NOW())",
+        "INSERT INTO Articles (title,content,url,publish_date,trust_score)"
+        " VALUES (%s,%s,%s,NOW(),%s)",
         (title, content, final_url, score)
     )
     conn.commit()
