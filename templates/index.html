@@ -133,6 +133,7 @@
         <div class="card-glass mb-4">
             <h2>🧠 AI Fake News Analyzer</h2>
 
+            <!-- Submit Article -->
             <div class="section-header"><i class="bi bi-pencil-square"></i> Submit an Article</div>
             <form method="POST" action="{{ url_for('add_article') }}">
                 <input type="text" name="title" class="form-control mb-2" placeholder="Title" required>
@@ -142,19 +143,7 @@
                 <button class="btn btn-success w-100" type="submit">Submit Article</button>
             </form>
 
-            <div class="section-header mt-4"><i class="bi bi-flag"></i> Report Fake News</div>
-            <form method="POST" action="{{ url_for('add_article') }}">
-                <input type="number" name="article_id" class="form-control mb-2" placeholder="Article ID" required>
-                <input type="text" name="reason" class="form-control mb-3" placeholder="Reason" required>
-                <button class="btn btn-danger w-100" type="submit">Submit Report</button>
-            </form>
-
-            <div class="section-header mt-4"><i class="bi bi-search"></i> Detect Fake News</div>
-            <form method="POST" action="{{ url_for('check_online') }}">
-                <input type="number" name="article_id" class="form-control mb-3" placeholder="Enter Article ID" required>
-                <button class="btn btn-primary w-100" type="submit">Check Trust</button>
-            </form>
-
+            <!-- Check Online Article -->
             <div class="section-header mt-4"><i class="bi bi-globe"></i> Check Online Article</div>
             <form method="POST" action="{{ url_for('check_online') }}">
                 <input type="text" name="url_link" class="form-control mb-3" placeholder="Enter Article URL" required>
@@ -162,6 +151,7 @@
             </form>
         </div>
 
+        <!-- Safe Articles -->
         <div class="card-glass mb-4">
             <div class="section-header"><i class="bi bi-shield-check"></i> Safe News Articles</div>
             <div class="table-responsive">
@@ -196,6 +186,7 @@
             </div>
         </div>
 
+        <!-- Risky Articles -->
         <div class="card-glass mb-4">
             <div class="section-header"><i class="bi bi-exclamation-triangle"></i> Risky News Articles</div>
             <div class="table-responsive">
