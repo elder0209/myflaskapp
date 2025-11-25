@@ -1,17 +1,16 @@
 import os
 import time
 import logging
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from urllib.parse import urlparse
 
 from flask import (
-    Flask, render_template, request, redirect, session, flash, url_for, jsonify
+    Flask, render_template, request, redirect, session, flash, url_for
 )
 
 import mysql.connector
 import requests
 from bs4 import BeautifulSoup
-import random
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # ------------------- Basic App Config -------------------
@@ -21,7 +20,7 @@ app.config["SECRET_KEY"] = "supersecretkey"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ------------------- DB Connection (Simple) -------------------
+# ------------------- DB Connection -------------------
 def get_db():
     try:
         conn = mysql.connector.connect(
@@ -30,19 +29,17 @@ def get_db():
             password=os.getenv("DB_PASS", ""),
             database=os.getenv("DB_NAME", "fake_news_db")
         )
-        cursor = conn.cursor(dictionary=True)
-        return conn, cursor
+        return conn, conn.cursor(dictionary=True)
     except Exception as e:
         logger.error("DB CONNECTION FAILED: %s", e)
         return None, None
 
-# ------------------- Trust Score (Lightweight) -------------------
+# ------------------- Trust Score -------------------
 def simple_score(text):
-    """Ultra lightweight scoring system"""
     if not text:
         return 30
-    score = 50
 
+    score = 50
     low = text.lower()
     bad_words = ["shocking", "fake", "click", "scam", "you won't believe"]
 
@@ -57,7 +54,7 @@ def simple_score(text):
 
     return max(0, min(100, score))
 
-# ------------------- Fetch Article Text -------------------
+# ------------------- Fetch Article -------------------
 headers = {"User-Agent": "Mozilla/5.0"}
 
 def fetch_article(url):
@@ -96,7 +93,7 @@ def home():
         safe_news=safe,
         risky_news=risky,
         name=session.get("name"),
-        today=date.today()
+        today=date.today(),
     )
 
 # ------------ Signup ------------
@@ -122,8 +119,8 @@ def signup():
     )
     conn.commit()
     conn.close()
-
     flash("Signup successful", "success")
+
     return redirect(url_for("login_page"))
 
 # ------------ Login ------------
@@ -196,7 +193,6 @@ def logout():
     session.clear()
     return redirect(url_for("login_page"))
 
-# ------------ Health Check ------------
 @app.route("/health")
 def health():
     return {"status": "ok"}
